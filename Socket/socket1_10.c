@@ -25,7 +25,7 @@ int main(int argc, char const *argv[])
     	int opt = 1; 
     	int addrlen = sizeof(address); 
     	char buffer[1024] = {0}; 
-    	char *hello = "Hello from server"; 
+    	char *hello = "server 0 sent a message to"; 
        
     	// Creating socket file descriptor 
     	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
@@ -66,10 +66,10 @@ int main(int argc, char const *argv[])
         	exit(EXIT_FAILURE); 
     	} 
     	
-	    	valread = read( new_socket , buffer, 1024); 
-	    	printf("%s\n",buffer ); 
+	    	valread = read( new_socket , buffer, 1024);
+	    	printf("%s server 0\n",buffer ); 
 	    	send(new_socket , hello , strlen(hello) , 0 ); 
-	    	printf("Hello message sent from server\n");
+	    	//printf("Hello message sent from server\n");
 	    }
 
 	}
@@ -91,7 +91,7 @@ int main(int argc, char const *argv[])
 				struct sockaddr_in serv_addr;
 				int j=i+48;
 				char hello[50];
-				sprintf(hello,"Hello from client %d",i);
+				sprintf(hello,"client %d ID %d has sent a message to",i,getpid());
 				char buffer[1024] = {0};
 				if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 				{ 
@@ -117,10 +117,11 @@ int main(int argc, char const *argv[])
 					return -1; 
 				}
 				send(sock , hello , strlen(hello) , 0 ); 
-				printf("Hello message sent from client %d ID %d\n",i,getpid()); 
+				//printf("Hello message sent from client %d ID %d\n",i,getpid()); 
 				valread = read( sock , buffer, 1024); 
-				printf("%s\n",buffer );
-				exit(0);			}
+				printf("%s client %d\n",buffer,i );
+				exit(0);			
+			}
 		}
 	}
 }
