@@ -8,6 +8,8 @@
 #include <semaphore.h>
 #include <sys/shm.h>
 #include <fcntl.h>
+#include <pthread.h>
+
 
 #define PORT 8080 
 
@@ -21,10 +23,9 @@ int main(int argc, char const *argv[])
     int shmid;                    /*      shared memory id        */
     sem_t *sem;                   /*      synch semaphore         */
     int *p;
-
+    unsigned int value = 1;
 
     shmkey = ftok ("/dev/null", 5);       /* valid directory name and a number */
-    printf ("shmkey for p = %d\n", shmkey);
     shmid = shmget (shmkey, sizeof (int), 0644 | IPC_CREAT);
     if (shmid < 0){                           /* shared memory error check */
         perror ("shmget\n");
@@ -34,7 +35,7 @@ int main(int argc, char const *argv[])
     p = (int *) shmat (shmid, NULL, 0);   /* attach p to shared memory */
     *p = 0;
 
-    sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, 1);
+    sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, value);
 
 
 	if((pid=fork())<0)
@@ -54,11 +55,10 @@ int main(int argc, char const *argv[])
 					exit(1);
 				}
 
-
 			if(pid==0)
 			{
 				sem_wait (sem);
-				
+
 				int server_fd, new_socket, valread; 
 			   	struct sockaddr_in address; 
 		    	int opt = 1; 
@@ -144,31 +144,36 @@ int main(int argc, char const *argv[])
 					printf("\n Socket creation error \n"); 
 					return -1; 
 				} 
-				for (int k = 0;k<0;k++)
-				{
-					memset(&serv_addr, '0', sizeof(serv_addr)); 
+				
+				memset(&serv_addr, '0', sizeof(serv_addr)); 
 
-					serv_addr.sin_family = AF_INET; 
-					serv_addr.sin_port = htons(PORT); 
+				serv_addr.sin_family = AF_INET; 
+				serv_addr.sin_port = htons(PORT); 
 					
-					// Convert IPv4 and IPv6 addresses from text to binary form 
-					if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) 
-					{ 
-						printf("\nInvalid address/ Address not supported \n"); 
-						return -1; 
-					} 
+				// Convert IPv4 and IPv6 addresses from text to binary form 
+				if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) 
+				{ 
+					printf("\nInvalid address/ Address not supported \n"); 
+					return -1; 
+				}
 
+				for (int k = 0;k<10;k++)
+				{
 					if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
 					{ 
-						printf("\nConnection Failed\n"); 
+						printf("\nConnection Failed -- client %d\n",i); 
 						return -1; 
 					}
 					send(sock , hello , strlen(hello) , 0 ); 
 					//printf("Hello message sent from client %d ID %d\n",i,getpid()); 
 					valread = read( sock , buffer, 1024); 
 					printf("%s client %d\n",buffer,i );
-					*p++;
-					while(*p%10){}
+					*p = *p + 1;
+					printf("%d\n",*p);
+					while(*p%10)
+					{
+						//printf("client %d run %d p = %d\n",i,k,*p );
+					}
 
 				
 				}
