@@ -96,11 +96,13 @@ int main()
 		{
 			sem_t *produtor;					/* Semaforo compartilhado entre os processos produtores */
 			sem_t *consumidor;					/* Semaforo compartilhado entre os processos consumidores */
+			sem_t *mutex;
 			int k=0;
 			
 			/* Iniciando semaforo compartilhado na memória */
-			produtor = sem_open("pSem", O_CREAT | O_EXCL, 0654, 1);
-			consumidor = sem_open("cSem", O_CREAT | O_EXCL, 0645, 1);
+			produtor = sem_open("pSem", O_CREAT | O_EXCL, 0644, 1);
+			consumidor = sem_open("cSem", O_CREAT | O_EXCL, 0322, 1);
+			mutex = sem_open("mSem", O_CREAT | O_EXCL, 1244, 0);
 			
 			for(i=0; i<20; i++)						/* Criando 9 processos filhos, para totalizar 10 */
 			{
@@ -114,35 +116,33 @@ int main()
 			}
 			if(pid>0)
 			{
-				if(i==0)
+				/* Esperando todos os filhos saire, afinal, o ultimo processo a sair sera um filho */
+				while(pid=waitpid(-1, NULL, 0))	/* Espera pelo processo término do processo filho até que */
 				{
-					/* Esperando todos os filhos saire, afinal, o ultimo processo a sair sera um filho */
-					while(pid=waitpid(-1, NULL, 0))	/* Espera pelo processo término do processo filho até que */
-					{
-						if(errno == ECHILD)			/* Nenhum processo filho exista mais, entao errno e atualizado com ECHILD */
-							break;
-					}
-					
-					sem_unlink ("pSem");			/* Desligando o semaforo */
-					sem_unlink ("cSem");
-					sem_close (produtor);			/* Fechando o semaforo */
-					sem_close(consumidor);
-					exit(0);
-					
+					if(errno == ECHILD)			/* Nenhum processo filho exista mais, entao errno e atualizado com ECHILD */
+						break;
 				}
+				printf("Todos os filhos sairam\n");
+				
+				sem_unlink ("pSem");			/* Desligando o semaforo */
+				sem_unlink ("cSem");
+				sem_unlink ("mSem");
+				sem_close (produtor);			/* Fechando o semaforo */
+				sem_close(consumidor);
+				sem_close(mutex);
+				exit(0);
 			}else
 			{
-				if(i<=10)
+				if(i<10)
 				{
 					close(fd1[0]);								/* Fechando os canais para escrita e leitura */
 					close(fd2[1]);
 					
 					while(k<10)
 					{
-						//sem_wait(produtor);
-						printf("Produtor entrando na zona critica\n");
-						pipeDezDez(pid, fd1, fd2, i);
-						//sem_post(produtor);
+						sem_wait(produtor);						/* Produtor entrando na zona critica */
+						pipeDezDez(pid, mutex, consumidor, fd1, fd2, i);
+						sem_post(produtor);						/* Produtor saindo da zona critica */
 						k++;
 					}
 					
@@ -153,10 +153,15 @@ int main()
 				}else
 				{
 					
+					close(fd1[1]);								/* Neste caso, o processo pai vai ler do primeiro e escrever no segundo */
+					close(fd2[0]);								/* Logo, deixa se o fd1[0] aberto para ler e o fd2[1] aberto para escrever */
+					
 					//sem_wait(consumidor);
-					printf("Consumidor entrando na zona critica\n");
-					pipeDezDez(pid, fd1, fd2, i);
+					pipeDezDez(pid, mutex, consumidor, fd1, fd2, i);
 					//sem_post(consumidor);
+					
+					close(fd1[0]);								/* Fechando os arquivos para leitura e escrita */
+					close(fd2[1]);
 				}
 			}
 			break;
