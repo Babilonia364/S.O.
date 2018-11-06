@@ -157,20 +157,18 @@ void pipeDezUm(pid_t pid, int* fd1, int* fd2, int i)
 		int soma, j=0;
 
 
-		while(j<=10)
+		while(j<10)
 		{
 			if(turn==0)								/* Hora de ler do fd1[0] para fazer a soma */
 			{										/* Numeros vindo do pai */
 				read(fd1[0], num2, sizeof(num2));	/* Recebeu os numeros de papai */
 				turn=1;								/* Muda o turn para o efetuar o passo seguinte */
-				j++;
-			}else if(num2[0]==0 && num2[1]==0)
-				break;
-			else if(turn==1)						/* Hora de efetuar a soma e mandar de volta para o suggar daddy */
+			}else if(turn==1)						/* Hora de efetuar a soma e mandar de volta para o suggar daddy */
 			{										/* Numeros recebidos de papai */
 				soma=num2[0]+num2[1];
 				write(fd2[1], &soma, sizeof(soma));	/* Enviando a soma para o papis pelo pipe */
 				turn=0;
+				j++;
 			}
 		}
 
@@ -179,7 +177,7 @@ void pipeDezUm(pid_t pid, int* fd1, int* fd2, int i)
 	}
 }
 
-void pipeDezDez(pid_t pid, int* fd1, int* fd2, int i)
+void pipeDezDez(pid_t pid, sem_t* mutex, sem_t* consumidor, int* fd1, int* fd2, int i)
 {
 	int turn=0;
 	
@@ -192,7 +190,7 @@ void pipeDezDez(pid_t pid, int* fd1, int* fd2, int i)
 	/*`------'`------'`------'`------'`------'`------'`------'`------'  '-'`------'`------'`------'*/
 	/***********************************************************************************************/
 	
-	if(i<=0)										/* O pai se comunicara com os 10 filhos */
+	if(i<10)										/* O pai se comunicara com os 10 filhos */
 	{
 		
 		int num[2];									/* Numeros lidos pelo suggar daddy */
@@ -206,6 +204,7 @@ void pipeDezDez(pid_t pid, int* fd1, int* fd2, int i)
 				num[0]=i;
 				num[1]=i+1;
 				
+				sem_wait(mutex);						/* Esperando o produtor estar pronto para ler os numeros enviados */
 				write(fd1[1], num, sizeof(num));		/* Escrevendo o conteudo no canal 1 */
 				turn=1;
 			}else if(turn==1)
@@ -234,25 +233,26 @@ void pipeDezDez(pid_t pid, int* fd1, int* fd2, int i)
 		int soma;
 		int j=0;
 		
-		close(fd1[1]);								/* Neste caso, o processo pai vai ler do primeiro e escrever no segundo */
-		close(fd2[0]);								/* Logo, deixa se o fd1[0] aberto para ler e o fd2[1] aberto para escrever */
-		
-		while(j<=10)
+		while(j<10)
 		{
+			//sem_wait(consumidor);					/* Entrando na zona critica do produtor */
 			if(turn==0)
 			{
-				read(fd1[0], num2, sizeof(num2));
+				sem_post(mutex);					/* Avisando ao consumidor que esta pronto para receber a soma */
 				turn=1;
-				j++;
-			}else if(turn==1)
+			}
+			else if(turn==1)
+			{
+				read(fd1[0], num2, sizeof(num2));
+				turn=2;
+			}else if(turn==2)
 			{
 				soma=num2[0]+num2[1];
 				write(fd2[1], &soma, sizeof(soma));
 				turn=0;
+				j++;
 			}
+			//sem_post(consumidor);					/* Saindo da zona critica do consumidor */
 		}
-		
-		close(fd1[0]);								/* Fechando os arquivos para leitura e escrita */
-		close(fd2[1]);
 	}
 }
