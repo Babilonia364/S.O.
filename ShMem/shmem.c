@@ -5,6 +5,7 @@
 #include <sys/shm.h>							/*					shmat()					*/
 #include <sys/wait.h>							/*				wait, waitpid				*/
 #include <unistd.h>								/*					sleep()					*/
+#include <errno.h>								/*				errno, ECHILD				*/
 #include <semaphore.h>							/* Incluindo a biblioteca do linux para semaforos */
 #include <fcntl.h>								/*				O_CREAT, O_EXEC					*/
 #include "shmem.h"
@@ -111,6 +112,76 @@ int main()
 				printf("produtor saiu da zona critica\n");
 			}
 			
+			break;
+		}
+		
+		case P10P10:
+		{
+			sem_t *sync1;						/* Declarando semaforo */
+			sem_t *sync2;
+			sem_t *produtor;
+			sem_t *consumidor;
+			int j;
+			
+			/* Iniciando semaforo para sincronizar os processos */
+			sync1 = sem_open("s1Sem", O_CREAT | O_EXCL, 0644, 0);
+			sync2 = sem_open("s2Sem", O_CREAT | O_EXCL, 0322, 0);
+			produtor = sem_open("pSem", O_CREAT | O_EXCL, 1288, 1);
+			consumidor = sem_open("cSem", O_CREAT | O_EXCL, 0161, 1);
+			
+			for(i=0; i<20; i++)
+			{
+				/* Criando 20 processos filhos para se comunicarem entre si */
+				if((pid=fork())<0)
+				{
+					perror("fork\n");
+					exit(1);
+				}
+				
+				if(pid==0)
+					break;
+			}
+			
+			if(pid>0)
+			{
+				while(pid=waitpid(-1, NULL, 0))
+				{
+					if (errno == ECHILD)
+						break;
+				}
+				printf("Apagando as paradas\n");
+				
+				shmdt(mem);						/* Desanexando da memoria */
+				shmctl(shmId, IPC_RMID, NULL);	/* Destruindo memória compartilhada */
+				sem_unlink ("s1Sem");			/* Desligando o semaforo */
+				sem_unlink ("s2Sem");
+				sem_unlink ("pSem");
+				sem_unlink ("cSem");
+				sem_close (sync1);				/* Fechando o semaforo */
+				sem_close (sync2);
+				sem_close (produtor);
+				sem_close (consumidor);
+			}else
+			{
+				if(i<10)
+				{
+					sem_wait(consumidor);
+					printf("consumidor entrou na zona critica");
+					memDezDez(pid, sync1, sync2, s, c, mem, i);
+					sem_post(consumidor);
+					printf("consumidor saiu da zona critica\n");
+				}else
+				{
+					for(j=0; j<10; j++)
+					{
+						sem_wait(produtor);
+						printf("produtor entrou na zona critica\n");
+						memDezDez(pid, sync1, sync2, s, c, mem, i);
+						sem_post(produtor);
+						printf("produtor saiu da zona critica\n");
+					}
+				}
+			}
 			break;
 		}
 	}
