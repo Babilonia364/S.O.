@@ -25,14 +25,14 @@ int main(int argc, char const *argv[])
     int *p;
     unsigned int value = 1;
 
-    shmkey = ftok ("/dev/null", 5);       /* valid directory name and a number */
+    shmkey = ftok ("/dev/null", 5);       /* pq tem um cinco aki? */
     shmid = shmget (shmkey, sizeof (int), 0644 | IPC_CREAT);
     if (shmid < 0){                           /* shared memory error check */
         perror ("shmget\n");
         exit (1);
     }
 
-    p = (int *) shmat (shmid, NULL, 0);   /* attach p to shared memory */
+    p = (int *) shmat (shmid, NULL, 0);   /* Esse p eu uso pra fazer a barreira no cliente */
     *p = 0;
 
     sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, value);
@@ -43,10 +43,22 @@ int main(int argc, char const *argv[])
 		perror("fork");
 		exit(1);
 	}
-
+/***
+ *          ___           ___           ___           ___           ___           ___     
+ *         /\  \         /\  \         /\  \         /\__\         /\  \         /\  \    
+ *        /::\  \       /::\  \       /::\  \       /:/  /        /::\  \       /::\  \   
+ *       /:/\ \  \     /:/\:\  \     /:/\:\  \     /:/  /        /:/\:\  \     /:/\:\  \  
+ *      _\:\~\ \  \   /::\~\:\  \   /::\~\:\  \   /:/__/  ___   /::\~\:\  \   /::\~\:\  \ 
+ *     /\ \:\ \ \__\ /:/\:\ \:\__\ /:/\:\ \:\__\  |:|  | /\__\ /:/\:\ \:\__\ /:/\:\ \:\__\
+ *     \:\ \:\ \/__/ \:\~\:\ \/__/ \/_|::\/:/  /  |:|  |/:/  / \:\~\:\ \/__/ \/_|::\/:/  /
+ *      \:\ \:\__\    \:\ \:\__\      |:|::/  /   |:|__/:/  /   \:\ \:\__\      |:|::/  / 
+ *       \:\/:/  /     \:\ \/__/      |:|\/__/     \::::/__/     \:\ \/__/      |:|\/__/  
+ *        \::/  /       \:\__\        |:|  |        ~~~~          \:\__\        |:|  |    
+ *         \/__/         \/__/         \|__|                       \/__/         \|__|    
+ */
 	if(pid>0)
 	{
-		for(int i=0;i<10;i++)
+		for(int i=0;i<10;i++)//fork 10 vezes pra criar 10 servers
 		{
 			pid_t pid;
 			if((pid=fork())<0)
@@ -54,10 +66,10 @@ int main(int argc, char const *argv[])
 					perror("fork");
 					exit(1);
 				}
-
 			if(pid==0)
 			{
-				sem_wait (sem);
+				sem_wait (sem);//o sem aki pra garantir que apenas um server vai executar por vez
+				//é aki onde a porra não funciona, o cod ignora o semaforo eu acho
 
 				int server_fd, new_socket, valread; 
 			   	struct sockaddr_in address; 
@@ -92,9 +104,9 @@ int main(int argc, char const *argv[])
 		        	perror("bind failed"); 
 		        	exit(EXIT_FAILURE); 
 		    	}
-		    	for(int k = 0;k<10;k++)
+		    	for(int k = 0;k<10;k++)//aki ele entra em conexão 10 vezes seguidas
 		    	{ 
-			    	if (listen(server_fd, 3) < 0) 
+			    	if (listen(server_fd, 3) < 0) //aki ele para e espera alguem conectar
 			    	{ 
 			        	perror("listen"); 
 			        	exit(EXIT_FAILURE); 
@@ -106,17 +118,34 @@ int main(int argc, char const *argv[])
 			        	exit(EXIT_FAILURE); 
 			    	} 
 			    	
-				    valread = read( new_socket , buffer, 1024);
+				    valread = read( new_socket , buffer, 1024);//aki ele le o que o cliente colocou no buffer
 				    printf("%s server %d\n",buffer,i ); 
 				    send(new_socket , hello , strlen(hello) , 0 ); 
 				    //printf("Hello message sent from server\n");
 			    }
-			    sem_post (sem);
+			    sem_post (sem);// depois de conectar com 10 clientes ele dá espaço pra outro server
 			    exit(0);
 			}
 		}
 
 	}
+	
+	
+	
+/***
+ *          ___           ___                   ___           ___           ___     
+ *         /\  \         /\__\      ___        /\  \         /\__\         /\  \    
+ *        /::\  \       /:/  /     /\  \      /::\  \       /::|  |        \:\  \   
+ *       /:/\:\  \     /:/  /      \:\  \    /:/\:\  \     /:|:|  |         \:\  \  
+ *      /:/  \:\  \   /:/  /       /::\__\  /::\~\:\  \   /:/|:|  |__       /::\  \ 
+ *     /:/__/ \:\__\ /:/__/     __/:/\/__/ /:/\:\ \:\__\ /:/ |:| /\__\     /:/\:\__\
+ *     \:\  \  \/__/ \:\  \    /\/:/  /    \:\~\:\ \/__/ \/__|:|/:/  /    /:/  \/__/
+ *      \:\  \        \:\  \   \::/__/      \:\ \:\__\       |:/:/  /    /:/  /     
+ *       \:\  \        \:\  \   \:\__\       \:\ \/__/       |::/  /     \/__/      
+ *        \:\__\        \:\__\   \/__/        \:\__\         /:/  /                 
+ *         \/__/         \/__/                 \/__/         \/__/                  
+ */
+
 	else if(pid==0)
 	{
 		
@@ -157,7 +186,7 @@ int main(int argc, char const *argv[])
 					return -1; 
 				}
 
-				for (int k = 0;k<10;k++)
+				for (int k = 0;k<10;k++)//eu não sei se esse for é aki ou não pq não tem como testar direito
 				{
 					if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
 					{ 
@@ -172,14 +201,19 @@ int main(int argc, char const *argv[])
 					printf("%d\n",*p);
 					while(*p%10)
 					{
-						//printf("client %d run %d p = %d\n",i,k,*p );
+						//eis aki a barreira da gambiarra. o *p é uma variavel compartilhada entre todos
+						//os processos depois que o cliente envia e recebe a mensagem do servidor ele
+						//adiciona 1 ao *p como são dez processos quando *p for igual a 10 ele tera completado
+						//a primeira iteração de cada um dos clientes *p%10 só será 0 quando *p for multiplo de
+						//10 e como a adição só ocorre antes da barreira todos os clientes conseguem passar por
+						//ela.
 					}
 
 				
 				}
 
 				shmdt (p);
-		        shmctl (shmid, IPC_RMID, 0);
+		        shmctl (shmid, IPC_RMID, 0);//o cod nunca chegou até aki
 
 		        /* cleanup semaphores */
 		        sem_unlink ("pSem");   
