@@ -5,6 +5,8 @@
 #include <sys/shm.h>							/*					shmat()					*/
 #include <sys/wait.h>							/*				wait, waitpid				*/
 #include <unistd.h>								/*					sleep()					*/
+#include <semaphore.h>							/* Incluindo a biblioteca do linux para semaforos */
+#include <fcntl.h>								/*				O_CREAT, O_EXEC					*/
 #include "shmem.h"
 
 #define P1P1 1										/* Fazendo 1 processo se comunicar com 1 */
@@ -20,7 +22,7 @@ int main()
 	int shmId;						/* Id da area de memoria retornada pela shmget */
 	int tam=30*sizeof(int);			/* Tamanho em bytes que é requerido para a memoria compartilhada  */
 	int *mem, c, *s;
-	int processos;
+	int processos, i;
 
 	printf("Quantos procesos voce deseja comunicar entre si?\n"
 			"Digite os respectivos inteiros de cada operacao\n"
@@ -62,7 +64,55 @@ int main()
 				shmctl(shmId, IPC_RMID, NULL);	/* Destruindo memória compartilhada */
 			}
 			
+		break;
+		
+		case P10P1:
+		{
+			sem_t *sync1;						/* Declarando semaforo */
+			sem_t *sync2;
+			sem_t *produtor;
+			
+			/* Iniciando semaforo para sincronizar os processos */
+			sync1 = sem_open("s1Sem", O_CREAT | O_EXCL, 0644, 0);
+			sync2 = sem_open("s2Sem", O_CREAT | O_EXCL, 0322, 0);
+			produtor = sem_open("pSem", O_CREAT | O_EXCL, 1288, 1);
+			
+			/* Criando 10 processos filhos que enviarao mensagem para o processo pai */
+			for(i=0; i<10; i++)
+			{
+				if((pid=fork())<0)				/* Caso o retorno do fork seja -1, deu erro */
+				{
+					perror("fork");
+					exit(1);
+				}
+				if(pid==0)						/* Caso seja um processo filho, sai do laco assim gera somente 10 processos filhos */
+					break;
+			}
+			
+			if(pid>0)
+			{
+				memDezUm(pid, sync1, sync2, s, c, mem, i);
+				
+				printf("Apagando as paradas\n");
+				shmdt(mem);						/* Desanexando da memoria */
+				shmctl(shmId, IPC_RMID, NULL);	/* Destruindo memória compartilhada */
+				sem_unlink ("s1Sem");			/* Desligando o semaforo */
+				sem_unlink ("s2Sem");
+				sem_unlink ("pSem");
+				sem_close (sync1);				/* Fechando o semaforo */
+				sem_close (sync2);
+				sem_close (produtor);
+			}else
+			{
+				sem_wait(produtor);
+				printf("produtor entrou na zona critica\n");
+				memDezUm(pid, sync1, sync2, s, c, mem, i);
+				sem_post(produtor);
+				printf("produtor saiu da zona critica\n");
+			}
+			
 			break;
+		}
 	}
 	
 	return 0;
