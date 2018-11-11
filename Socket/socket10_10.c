@@ -80,7 +80,11 @@ int main(int argc, char const *argv[])
 		    	char buffer[1024] = {0}; 
 		    	char hello[50];
 				sprintf(hello,"server %d ID %d has sent a message to",i,getpid());
-		       
+		       	
+
+		       	for(int k = 0;k<10;k++)//aki ele entra em conexão 10 vezes seguidas
+		    	{
+
 		    	// Creating socket file descriptor 
 		    	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
 		    	{ 
@@ -106,8 +110,7 @@ int main(int argc, char const *argv[])
 		        	perror("bind failed"); 
 		        	exit(EXIT_FAILURE); 
 		    	}
-		    	for(int k = 0;k<10;k++)//aki ele entra em conexão 10 vezes seguidas
-		    	{ 
+		    	 
 			    	if (listen(server_fd, 3) < 0) //aki ele para e espera alguem conectar
 			    	{ 
 			        	perror("listen"); 
@@ -123,10 +126,12 @@ int main(int argc, char const *argv[])
 				    valread = read( new_socket , buffer, 1024);//aki ele le o que o cliente colocou no buffer
 				    printf("%s server %d\n",buffer,i );
 				    close(new_socket);
+				    close(server_fd);
+				    shutdown(server_fd,2);
+				    shutdown(new_socket,2);
 				    //send(new_socket , hello , strlen(hello) , 0 ); 
 				    //printf("Hello message sent from server\n");
 			    }
-			    close(server_fd);
 
 			    //sem_post (sem);// depois de conectar com 10 clientes ele dá espaço pra outro server
 			    exit(0);
@@ -173,7 +178,8 @@ int main(int argc, char const *argv[])
 				char hello[50];
 				sprintf(hello,"client %d ID %d has sent a message to",i,getpid());
 				char buffer[1024] = {0};
-				
+				for (int k = 0;k<10;k++)//eu não sei se esse for é aki ou não pq não tem como testar direito
+				{
 				if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 				{ 
 					printf("\n Socket creation error \n"); 
@@ -191,14 +197,13 @@ int main(int argc, char const *argv[])
 					printf("\nInvalid address/ Address not supported \n"); 
 					return -1; 
 				}
-				for (int k = 0;k<10;k++)//eu não sei se esse for é aki ou não pq não tem como testar direito
-				{
+				
 				while(*p%10!=i)
 				{
 
 				}
 
-				
+					sleep(1);
 					if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
 					{ 
 						printf("\nConnection Failed -- client %d\n",i); 
@@ -211,7 +216,7 @@ int main(int argc, char const *argv[])
 					*p = *p + 1;
 					printf("%d\n",*p);
 					//shutdown(sock,2);
-					shutdown(sock,2);
+					
 					while(*p%10)
 					{
 						//eis aki a barreira da gambiarra. o *p é uma variavel compartilhada entre todos
@@ -221,6 +226,7 @@ int main(int argc, char const *argv[])
 						//10 e como a adição só ocorre antes da barreira todos os clientes conseguem passar por
 						//ela.
 					}
+					close(sock);
 
 				
 				}
