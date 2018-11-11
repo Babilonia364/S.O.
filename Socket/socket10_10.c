@@ -21,12 +21,11 @@ int main(int argc, char const *argv[])
 
 	key_t shmkey;                 /*      shared memory key       */
     int shmid;                    /*      shared memory id        */
-    sem_t *sem;                   /*      synch semaphore         */
+    //sem_t *sem;                   /*      synch semaphore         */
     int *p;
-    unsigned int value = 1;
 
     shmkey = ftok ("/dev/null", 5);       /* pq tem um cinco aki? */
-    shmid = shmget (shmkey, sizeof (int), 0644 | IPC_CREAT);
+    shmid = shmget (shmkey, 30*sizeof (int), 0644 | IPC_CREAT);
     if (shmid < 0){                           /* shared memory error check */
         perror ("shmget\n");
         exit (1);
@@ -35,7 +34,7 @@ int main(int argc, char const *argv[])
     p = (int *) shmat (shmid, NULL, 0);   /* Esse p eu uso pra fazer a barreira no cliente */
     *p = 0;
 
-    sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, value);
+    //sem = sem_open ("pSem", O_CREAT | O_EXCL, 0644, 1);
 
 
 	if((pid=fork())<0)
@@ -68,9 +67,12 @@ int main(int argc, char const *argv[])
 				}
 			if(pid==0)
 			{
-				sem_wait (sem);//o sem aki pra garantir que apenas um server vai executar por vez
-				//é aki onde a porra não funciona, o cod ignora o semaforo eu acho
+				while(*p/10!=i)
+				{
 
+				}
+				//sem_wait (sem);//o sem aki pra garantir que apenas um server vai executar por vez
+				//é aki onde a porra não funciona, o cod ignora o semaforo eu acho
 				int server_fd, new_socket, valread; 
 			   	struct sockaddr_in address; 
 		    	int opt = 1; 
@@ -119,11 +121,14 @@ int main(int argc, char const *argv[])
 			    	} 
 			    	
 				    valread = read( new_socket , buffer, 1024);//aki ele le o que o cliente colocou no buffer
-				    printf("%s server %d\n",buffer,i ); 
-				    send(new_socket , hello , strlen(hello) , 0 ); 
+				    printf("%s server %d\n",buffer,i );
+				    close(new_socket);
+				    //send(new_socket , hello , strlen(hello) , 0 ); 
 				    //printf("Hello message sent from server\n");
 			    }
-			    sem_post (sem);// depois de conectar com 10 clientes ele dá espaço pra outro server
+			    close(server_fd);
+
+			    //sem_post (sem);// depois de conectar com 10 clientes ele dá espaço pra outro server
 			    exit(0);
 			}
 		}
@@ -168,6 +173,7 @@ int main(int argc, char const *argv[])
 				char hello[50];
 				sprintf(hello,"client %d ID %d has sent a message to",i,getpid());
 				char buffer[1024] = {0};
+				
 				if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 				{ 
 					printf("\n Socket creation error \n"); 
@@ -185,9 +191,14 @@ int main(int argc, char const *argv[])
 					printf("\nInvalid address/ Address not supported \n"); 
 					return -1; 
 				}
-
 				for (int k = 0;k<10;k++)//eu não sei se esse for é aki ou não pq não tem como testar direito
 				{
+				while(*p%10!=i)
+				{
+
+				}
+
+				
 					if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) 
 					{ 
 						printf("\nConnection Failed -- client %d\n",i); 
@@ -195,10 +206,12 @@ int main(int argc, char const *argv[])
 					}
 					send(sock , hello , strlen(hello) , 0 ); 
 					//printf("Hello message sent from client %d ID %d\n",i,getpid()); 
-					valread = read( sock , buffer, 1024); 
-					printf("%s client %d\n",buffer,i );
+					//valread = read( sock , buffer, 1024); 
+					//printf("%s client %d\n",buffer,i );
 					*p = *p + 1;
 					printf("%d\n",*p);
+					//shutdown(sock,2);
+					shutdown(sock,2);
 					while(*p%10)
 					{
 						//eis aki a barreira da gambiarra. o *p é uma variavel compartilhada entre todos
@@ -216,8 +229,8 @@ int main(int argc, char const *argv[])
 		        shmctl (shmid, IPC_RMID, 0);//o cod nunca chegou até aki
 
 		        /* cleanup semaphores */
-		        sem_unlink ("pSem");   
-		        sem_close(sem);
+		        //sem_unlink ("pSem");   
+		        //sem_close(sem);
 
 				exit(0);			
 			}
